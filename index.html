@@ -244,6 +244,24 @@ main{position:relative;z-index:1;max-width:1080px;margin:0 auto;padding:1rem}
 </style>
 </head>
 <body>
+<script>
+// Hide loading screen IMMEDIATELY — pa atann Firebase
+(function(){
+  window.addEventListener('DOMContentLoaded', function(){
+    var ls = document.getElementById('LS');
+    if(ls) ls.style.display = 'none';
+    var as = document.getElementById('AS');
+    if(as) as.style.display = 'flex';
+  });
+  // Backup: kouri menmsi DOMContentLoaded deja pase
+  setTimeout(function(){
+    var ls = document.getElementById('LS');
+    if(ls && ls.style.display !== 'none') ls.style.display = 'none';
+    var as = document.getElementById('AS');
+    if(as && as.style.display === 'none') as.style.display = 'flex';
+  }, 100);
+})();
+</script>
 
 <!-- LOADING -->
 <div id="LS">
@@ -343,11 +361,11 @@ main{position:relative;z-index:1;max-width:1080px;margin:0 auto;padding:1rem}
     <div class="aic">
       <div class="aich">
         <div class="aiico">🧠</div>
-        <div style="flex:1"><div style="font-family:'Syne',sans-serif;font-size:.88rem;font-weight:700;color:#eef0f6">Scout IA</div><div style="font-size:.65rem;color:#00e676">● Perplexity + GPT-4o · Actif</div></div>
+        <div style="flex:1"><div style="font-family:'Syne',sans-serif;font-size:.88rem;font-weight:700;color:#eef0f6">Scout IA</div><div style="font-size:.65rem;color:#00e676">● Gemini 2.0 Flash · Actif</div></div>
         <div style="font-family:'JetBrains Mono',monospace;font-size:.65rem;color:#8892a4" id="aiCtr">0/5</div>
       </div>
       <div class="aimsg" id="aiMsgs">
-        <div class="mr ai"><div class="mav ai">🧠</div><div><div class="mb">Bonjour ! Je suis <strong>Scout IA</strong> — analyste football.<br>Je suis alimenté par <strong>Perplexity</strong> (web search) + <strong>GPT-4o</strong>.<br>5 analyses/jour. Je peux trouver les matchs réels et les analyser.<br><br>💡 <em>"Analyse PSG vs Marseille"</em> ou <em>"Matchs Premier League ce week-end"</em></div><div class="mt">Maintenant</div></div></div>
+        <div class="mr ai"><div class="mav ai">🧠</div><div><div class="mb">Bonjour ! Je suis <strong>Scout IA</strong> — analyste football.<br>Je suis alimenté par <strong>Gemini 2.0 Flash</strong> (Google AI) — pas de restriction CORS.<br>5 analyses/jour. Je peux trouver les matchs réels et les analyser.<br><br>💡 <em>"Analyse PSG vs Marseille"</em> ou <em>"Matchs Premier League ce week-end"</em></div><div class="mt">Maintenant</div></div></div>
       </div>
       <div class="aiinp">
         <textarea class="aitxt" id="aiTxt" rows="1" placeholder="Ex: Trouve les matchs de ce soir et analyse..." onkeydown="aiKey(event)"></textarea>
@@ -516,9 +534,34 @@ main{position:relative;z-index:1;max-width:1080px;margin:0 auto;padding:1rem}
 <div class="toast" id="toast"><span id="tI"></span><span id="tT"></span></div>
 
 <!-- FIREBASE SDK -->
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+// Chaje Firebase scripts dinamikman — pa bloke rendering
+(function loadFirebase(){
+  var scripts = [
+    'https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js',
+    'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js',
+    'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js'
+  ];
+  var loaded = 0;
+  function loadNext(i){
+    if(i >= scripts.length){
+      // Tout Firebase scripts chaje — init Firebase
+      if(typeof initFB === 'function') initFB();
+      else window._fbReady = true;
+      return;
+    }
+    var s = document.createElement('script');
+    s.src = scripts[i];
+    s.onload = function(){ loadNext(i+1); };
+    s.onerror = function(){ 
+      console.warn('Firebase script failed:', scripts[i]);
+      loadNext(i+1); 
+    };
+    document.head.appendChild(s);
+  }
+  loadNext(0);
+})();
+</script>
 
 <script>
 // ══════════════════════════════════════
@@ -533,7 +576,7 @@ const FB_CFG = {
   appId:"1:571379179932:web:7d165d287a169f02e86859"
 };
 // API Claude avec web_search tool (Perplexity-style via Claude)
-const CLAUDE_KEY = ""; // Clé supprimée pour sécurité, gérée par Netlify Functions
+const CLAUDE_KEY = ""; // Sécurisé via Netlify Functions
 const SUPER_ADMIN = "oberdestinville@gmail.com";
 
 // ══════════════════════════════════════
@@ -550,67 +593,52 @@ let mdCache={};
 // ══════════════════════════════════════
 // FIREBASE INIT — avec timeout protection
 // ══════════════════════════════════════
-(function initFB(){
-  // ── Timeout AGRESIF 5s — si Firebase pa reponn, montre auth screen ──
-  let fbDone = false;
-  const hardTimeout = setTimeout(()=>{
-    if(!fbDone){
-      fbDone = true;
-      console.warn('Firebase timeout — showing auth');
-      document.getElementById('LS').style.display='none';
-      ss('auth');
-    }
-  }, 5000);
+function initFB(){
+  // Montre auth IMEDYATMAN — pa atann Firebase
+  document.getElementById('LS').style.display = 'none';
+  ss('auth');
 
-  try{
+  // Init Firebase an background — san bloke UI
+  try {
     firebase.initializeApp(FB_CFG);
     auth = firebase.auth();
     db   = firebase.firestore();
+    try { db.settings({ experimentalForceLongPolling: true, merge: true }); } catch(e){}
 
-    // Desaktive persistans pou evite blokaj IndexedDB
-    db.settings({ experimentalForceLongPolling: true, merge: true });
-
-    auth.onAuthStateChanged(async user => {
-      if(fbDone) return; // timeout deja kouri
-      fbDone = true;
-      clearTimeout(hardTimeout);
-      document.getElementById('LS').style.display='none';
-
-      if(!user){ ss('auth'); return; }
-      if(!user.emailVerified){
-        document.getElementById('vEm').textContent=user.email;
-        ss('verify'); return;
-      }
-      currentUser=user;
-
-      // Chaje done ak timeout 4s — pa bloke si Firestore lent
-      try{
+    // Verifye si yon user deja konekte (session existante)
+    const unsubscribe = auth.onAuthStateChanged(async user => {
+      unsubscribe(); // Rele yon sèl fwa
+      if (!user || !user.emailVerified) return; // Pa gen session — rete sou auth
+      
+      // Gen session aktif — konekte dirèkteman
+      currentUser = user;
+      try {
         await Promise.race([
           Promise.all([loadUserData(), loadAdminEmails(), loadMatches()]),
-          new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),4000))
+          new Promise((_,r) => setTimeout(() => r(), 4000))
         ]);
-      }catch(e){
-        if(!matches.length) initDefaultMatches();
+      } catch(e) {
+        if (!matches.length) initDefaultMatches();
       }
-
       ss('app');
       startClock();
       renderNavUser();
       renderProfile();
       renderMatches();
       renderSaved();
-      if(isAdmin()) addAdminTab();
+      if (isAdmin()) addAdminTab();
       loadLeaderboard();
       setInterval(renderMatches, 60000);
       checkDailyScout();
     });
-  }catch(e){
-    clearTimeout(hardTimeout);
-    console.error('Firebase init error:', e);
-    document.getElementById('LS').style.display='none';
-    ss('auth');
+  } catch(e) {
+    console.error('Firebase error:', e);
+    // Auth screen deja afiche — pa gen pwoblèm
   }
-})();
+}
+// Auto-run if Firebase already loaded
+if(typeof firebase !== "undefined") initFB();
+else window._initFB = initFB;
 
 function ss(s){
   document.getElementById('AS').style.display  = s==='auth'   ? 'flex'  : 'none';
@@ -749,66 +777,81 @@ Réponds toujours en français.`;
 // ══════════════════════════════════════
 
 async function callAI(messages, maxTok=2000, useWebSearch=false){
-  const KEY = ""; // Clé supprimée pour sécurité
+  const GEMINI_KEY = "AIzaSyA2E96onBQa4c7hYcIkkKzeNS1x_tBz1qA";
   const now = new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  const body = {
-    model:'claude-sonnet-4-20250514',
-    max_tokens: maxTok,
-    system: SYS + '\n\nDate: ' + now,
-    messages: messages
-  };
-  if(useWebSearch) body.tools = [{type:'web_search_20250305',name:'web_search'}];
-
-  const hdrs = (key) => ({'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'});
-  const parse = async (r) => {
-    if(!r.ok) return null;
-    const d = await r.json();
-    if(!d.content) return null;
-    const txt = d.content.filter(b=>b.type==='text').map(b=>b.text).join('\n');
-    return txt.length > 5 ? txt : null;
-  };
-
-  // 1. Dirèk ak header spesyal Anthropic pou browser
-  try {
-    const r = await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{...hdrs(KEY),'anthropic-dangerous-allow-browser':'true'},
-      body:JSON.stringify(body)
+  
+  // Convertir messages → format Gemini
+  const geminiContents = [];
+  geminiContents.push({role:'user', parts:[{text: SYS + '\n\nDate: ' + now}]});
+  geminiContents.push({role:'model', parts:[{text:'Compris, je suis Scout IA football. Je réponds en français.'}]});
+  messages.forEach(m => {
+    geminiContents.push({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{text: m.content}]
     });
-    const txt = await parse(r);
-    if(txt) return txt;
-  } catch(e){}
+  });
 
-  // 2. corsproxy.io
-  try {
-    const r = await fetch('https://corsproxy.io/?'+encodeURIComponent('https://api.anthropic.com/v1/messages'),{
-      method:'POST', headers:hdrs(KEY), body:JSON.stringify(body)
-    });
-    const txt = await parse(r);
-    if(txt) return txt;
-  } catch(e){}
+  const body = JSON.stringify({
+    contents: geminiContents,
+    generationConfig: { maxOutputTokens: maxTok, temperature: 0.3 },
+    safetySettings: [
+      {category:'HARM_CATEGORY_HARASSMENT',threshold:'BLOCK_NONE'},
+      {category:'HARM_CATEGORY_HATE_SPEECH',threshold:'BLOCK_NONE'},
+      {category:'HARM_CATEGORY_SEXUALLY_EXPLICIT',threshold:'BLOCK_NONE'},
+      {category:'HARM_CATEGORY_DANGEROUS_CONTENT',threshold:'BLOCK_NONE'}
+    ]
+  });
 
-  // 3. thingproxy
-  try {
-    const r = await fetch('https://thingproxy.freeboard.io/fetch/https://api.anthropic.com/v1/messages',{
-      method:'POST', headers:hdrs(KEY), body:JSON.stringify(body)
-    });
-    const txt = await parse(r);
-    if(txt) return txt;
-  } catch(e){}
+  // Eseye plizyè modèl Gemini — chak gen pwòp quota gratis
+  const MODELS = [
+    'gemini-1.5-flash',
+    'gemini-1.5-flash-8b',
+    'gemini-1.5-pro',
+    'gemini-2.0-flash-lite'
+  ];
 
-  // 4. Netlify function (si deploye avec fonctions)
-  try {
-    const r = await fetch('/api/ai',{
+  for(const model of MODELS){
+    try{
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
+      const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body});
+      if(r.ok){
+        const data = await r.json();
+        const txt = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        if(txt.length > 5) return txt;
+      } else {
+        const e = await r.json();
+        const msg = e.error?.message || '';
+        // Si quota depase — eseye pwochen modèl
+        if(msg.includes('quota') || msg.includes('RESOURCE_EXHAUSTED')){
+          console.warn(`${model} quota exceeded, trying next...`);
+          continue;
+        }
+        throw new Error(msg || 'Gemini error ' + r.status);
+      }
+    } catch(e){
+      if(e.message.includes('quota') || e.message.includes('RESOURCE_EXHAUSTED')){
+        continue;
+      }
+      // Si se pa quota — stop
+      if(!e.message.includes('fetch')) throw e;
+    }
+  }
+
+  // Backup final: Netlify Function (Claude)
+  try{
+    const r = await fetch('/api/ai', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({...body, max_tokens:maxTok})
+      body: JSON.stringify({max_tokens:maxTok, system:SYS+'\n\nDate:'+now, messages})
     });
-    const txt = await parse(r);
-    if(txt) return txt;
+    if(r.ok){
+      const d = await r.json();
+      const txt = d.content?.filter(b=>b.type==='text').map(b=>b.text).join('\n')||'';
+      if(txt.length > 5) return txt;
+    }
   } catch(e){}
 
-  throw new Error('Scout IA indisponible. Verifiez votre connexion internet.');
+  throw new Error('Tous les quotas API sont dépassés. Réessayez dans 1 minute.');
 }
 
 
@@ -1166,8 +1209,38 @@ async function doLogin(){
   showM('aErr','');showM('aOk','');
   if(!e||!p){showM('aErr','⚠️ Remplissez tous les champs.');return;}
   const btn=document.getElementById('lBtn'); btn.disabled=true; btn.innerHTML='<span class="spn"></span>';
-  try{await auth.signInWithEmailAndPassword(e,p);}
-  catch(er){btn.disabled=false;btn.textContent='Se connecter';showM('aErr','❌ '+fbE(er.code));}
+  try{
+    const cred = await auth.signInWithEmailAndPassword(e,p);
+    const user = cred.user;
+    if(!user.emailVerified){
+      document.getElementById('vEm').textContent=user.email;
+      ss('verify'); return;
+    }
+    currentUser = user;
+    try {
+      await Promise.race([
+        Promise.all([loadUserData(), loadAdminEmails(), loadMatches()]),
+        new Promise((_,r) => setTimeout(() => r(), 4000))
+      ]);
+    } catch(err) {
+      if(!matches.length) initDefaultMatches();
+    }
+    ss('app');
+    startClock();
+    renderNavUser();
+    renderProfile();
+    renderMatches();
+    renderSaved();
+    if(isAdmin()) addAdminTab();
+    loadLeaderboard();
+    setInterval(renderMatches, 60000);
+    checkDailyScout();
+  }
+  catch(er){
+    btn.disabled=false;
+    btn.textContent='Se connecter';
+    showM('aErr','❌ '+fbE(er.code));
+  }
 }
 
 async function doRegister(){
@@ -1193,15 +1266,37 @@ async function doRegister(){
 async function doGoogle(){
   showM('aErr','');
   try{
-    const result=await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+    const result = await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+    const user = result.user;
     if(result.additionalUserInfo.isNewUser){
-      const u=result.user;
-      await db.collection('users').doc(u.uid).set({
-        name:u.displayName||u.email.split('@')[0],email:u.email,uid:u.uid,
+      await db.collection('users').doc(user.uid).set({
+        name:user.displayName||user.email.split('@')[0],email:user.email,uid:user.uid,
         joinedAt:firebase.firestore.FieldValue.serverTimestamp(),pts:50,wins:0,predictions:0
       });
     }
-  }catch(er){if(er.code!=='auth/popup-closed-by-user')showM('aErr','❌ '+fbE(er.code));}
+    currentUser = user;
+    try {
+      await Promise.race([
+        Promise.all([loadUserData(), loadAdminEmails(), loadMatches()]),
+        new Promise((_,r) => setTimeout(() => r(), 4000))
+      ]);
+    } catch(err) {
+      if(!matches.length) initDefaultMatches();
+    }
+    ss('app');
+    startClock();
+    renderNavUser();
+    renderProfile();
+    renderMatches();
+    renderSaved();
+    if(isAdmin()) addAdminTab();
+    loadLeaderboard();
+    setInterval(renderMatches, 60000);
+    checkDailyScout();
+  }catch(er){
+    if(er.code!=='auth/popup-closed-by-user')
+      showM('aErr','❌ '+fbE(er.code));
+  }
 }
 
 async function checkV(){
